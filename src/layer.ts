@@ -326,7 +326,6 @@ export class Layer {
     }
   }
 }
-export default Layer;
 
 export function match(options?: LayerOptions) {
   return new Layer(options).callback();

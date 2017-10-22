@@ -53,7 +53,6 @@ export function accepts(header: string, provided?: Iterable<string>|IterableIter
     .filter(isQuality)
     .sort(compareSpecs);
 }
-export default accepts;
 
 export function preffered(header: string, provided?: Iterable<string>|IterableIterator<string>): string|false {
   const filtered = accepts(header, provided);

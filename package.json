@@ -2,7 +2,7 @@
   "name": "koa-layer",
   "version": "1.0.0",
   "description": "A small matching library for Koa.",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
     "test": "ts-mocha .",
     "build": "tsc -p .",
