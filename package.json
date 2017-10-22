@@ -1,0 +1,28 @@
+{
+  "name": "koa-layer",
+  "version": "1.0.0",
+  "description": "A small matching library for Koa.",
+  "main": "index.js",
+  "scripts": {
+    "test": "ts-mocha .",
+    "build": "tsc -p .",
+    "install": "npm run build"
+  },
+  "author": "Mikal Stordal <mikalstordal@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "is-iterable": "^1.1.0",
+    "koa-compose": "^4.0.0",
+    "mime-types": "^2.1.17",
+    "path-to-regexp": "^2.1.0"
+  },
+  "devDependencies": {
+    "@types/koa": "^2.0.39",
+    "@types/koa-compose": "^3.2.2",
+    "@types/mime-types": "^2.1.0",
+    "@types/path-to-regexp": "^1.7.0",
+    "mocha": "^4.0.1",
+    "ts-mocha": "^1.0.3",
+    "typescript": "^2.5.3"
+  }
+}
