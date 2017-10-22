@@ -20,6 +20,8 @@
     "@types/koa": "^2.0.39",
     "@types/koa-compose": "^3.2.2",
     "@types/mime-types": "^2.1.0",
+    "@types/mocha": "^2.2.43",
+    "@types/node": "^8.0.46",
     "@types/path-to-regexp": "^1.7.0",
     "mocha": "^4.0.1",
     "ts-mocha": "^1.0.3",
