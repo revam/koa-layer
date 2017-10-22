@@ -18,6 +18,7 @@
 
 import * as compose from 'koa-compose';
 import * as convert from 'path-to-regexp';
+import * as isIterable from 'is-iterable';
 import {lookup} from 'mime-types';
 import {accepts, preffered, ParsedHeader} from './accepts';
 
@@ -88,7 +89,7 @@ export class Layer {
         this.methods.add(options.methods.toUpperCase());
       }
 
-      else if ('object' === typeof options.methods && Reflect.has(options.methods, Symbol.iterator)) {
+      else if (isIterable(options.methods)) {
         for (const method of options.methods) {
           if ('string' === typeof method) {
             this.methods.add(method.toUpperCase())
@@ -106,7 +107,7 @@ export class Layer {
         accepts.push(options.accepts);
       }
 
-      else if ('object' === typeof options.accepts && Reflect.has(options.accepts, Symbol.iterator)) {
+      else if (isIterable(options.accepts)) {
         for (const accept of options.accepts) {
           if ('string' === typeof accept) {
             accepts.push(accept)
@@ -127,7 +128,7 @@ export class Layer {
         this.stack.push(options.handlers);
       }
 
-      else if ('object' === typeof options.handlers && Reflect.has(options.handlers, Symbol.iterator)) {
+      else if (isIterable(options.handlers)) {
         for (const handler of options.handlers) {
           if ('function' === typeof handler) {
             this.stack.push(handler)
