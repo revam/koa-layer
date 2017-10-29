@@ -44,27 +44,6 @@ const layer = new Layer({
 // it is possible to append handlers after creation
 layer.use((ctx, next) => next());
 
-// layer.url() returns an url constructed with parameters supplied in path
-let url;
-
-// no parameters
-url = new Layer({path: '/path/to/file'})url();
-console.log(url);
-// prints: '/path/to/file'
-
-// starting slash can be ommitted.
-url = new Layer({path: 'path/to/file'}).url();
-console.log(url);
-// prints: '/path/to/file'
-
-// see module 'path-to'regexp' for what is a valid path
-url = new Layer({path: '/path/:to?/:file?*'}).url({
-  to: 'for',
-  file: 'your/heart'
-})
-console.log(url);
-// prints: '/path/to/your/heart'
-
 // layer.param() makes it easier to get data
 new Layer({path: 'users/:user'}).param('user', async(id, ctx) => await UserTable.getById(id));
 
