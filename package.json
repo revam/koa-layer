@@ -1,8 +1,8 @@
 {
   "name": "koa-match",
   "version": "1.0.0",
-  "description": "A small route matching library for Koa.",
   "main": "dist/index.js",
+  "description": "A small matching library for Koa.",
   "scripts": {
     "test": "ts-mocha tests/**/*.test.ts",
     "build": "tsc -p .",

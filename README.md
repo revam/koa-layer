@@ -48,7 +48,7 @@ layer.use((ctx, next) => next());
 new Layer({path: 'users/:user'}).param('user', async(id, ctx) => await UserTable.getById(id));
 
 // we store some data in ctx.state, as it may be useful when debugging
-async(ctx) => {
+layer.use(async(ctx) => {
   // Most recent layer
   ctx.state.layer // -> ctx.state.layers[0]
   // All layers in an array
@@ -65,10 +65,10 @@ async(ctx) => {
     layer, // Layer
   }];
   // Preffered content-type for response, only available when provided with 'accept' and/or 'accepts'.
-  ctx.state.preffered // string|false
+  ctx.state.preffered // string
   // ALL parameters collected till we reached this layer.
   ctx.state.params // Map<string|number, any>
-}
+});
 
 // supply the callback handler to koa
 app.use(layer.callback());
