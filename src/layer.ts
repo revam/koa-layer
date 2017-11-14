@@ -156,16 +156,16 @@ export class Layer {
   }
 
   private match(path: string): boolean|Map<string|number, any> {
-    if (!path) {
-      return false;
-    }
-
     // no path configured
     if (!this.path) {
       return true;
     }
 
     const params = new Map<string|number, any>();
+
+    if (!path) {
+      return false;
+    }
 
     if ('/' !== path[0]) {
       path = `/${path}`;
