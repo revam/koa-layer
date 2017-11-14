@@ -1,18 +1,18 @@
-# koa-layer
+# koa-match
 
-A small matching library for Koa built in typescript. Inspired by [`koa-router`](https://www.npmjs.com/package/koa-router)
+A small matching library for Koa built in typescript. Inspired by [`koa-router`](https://www.npmjs.com/package/koa-router).
 
 ## Installation
 
 ```sh
-npm install --save koa-layer
+npm install --save koa-match
 ```
 
 ## Usage
 
 ```js
 const Koa = require('koa');
-const {match, Layer} = require('koa-layer');
+const {match, Layer} = require('koa-match');
 
 const app = new Koa;
 

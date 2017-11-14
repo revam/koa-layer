@@ -1,5 +1,5 @@
 {
-  "name": "koa-layer",
+  "name": "koa-match",
   "version": "1.0.0",
   "description": "A small route matching library for Koa.",
   "main": "dist/index.js",
