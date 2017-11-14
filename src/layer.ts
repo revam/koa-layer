@@ -137,6 +137,11 @@ export class Layer {
       }
     }
 
+    // Add head if GET is present, disregarding if previous added.
+    if (this.methods.has('GET')) {
+      this.methods.add('HEAD');
+    }
+
     for (const fn of this.stack) {
       const type = typeof fn;
 
@@ -151,16 +156,16 @@ export class Layer {
   }
 
   private match(path: string): boolean|Map<string|number, any> {
-    if (!path) {
-      return false;
-    }
-
     // no path configured
     if (!this.path) {
       return true;
     }
 
     const params = new Map<string|number, any>();
+
+    if (!path) {
+      return false;
+    }
 
     if ('/' !== path[0]) {
       path = `/${path}`;
@@ -209,43 +214,6 @@ export class Layer {
     return filtered.length? filtered : false;
   }
 
-  url(...params: any[]) {
-    const url = this.path.replace('\(\.\*\)', '');
-    const to_path = convert.compile(url);
-
-    let data: object = {};
-    if (params.length === 1) {
-      if (params[0] instanceof Array) {
-        params = params[0];
-      }
-
-      else if ('object' === typeof params[0]) {
-        data = params[0];
-
-        if (Reflect.ownKeys(data).length !== this.keys.length) {
-          throw `missing params from provided object`;
-        }
-
-        params.length = 0;
-      }
-    }
-
-    if (params instanceof Array && params.length) {
-      const tokens = convert.parse(url);
-
-      if (params.length !== tokens.length) {
-        throw `not enough params provided; a differance of ${params.length-tokens.length}.`;
-      }
-
-      for (const token of tokens as convert.Key[])
-      if (token.name) {
-        data[token.name] = params.shift();
-      }
-    }
-
-    return to_path(data);
-  }
-
   param<T>(param: string, handler: ParameterMiddleware<T>): this {
     if ('string' !== typeof param) {
       throw 'invalid param';
@@ -255,6 +223,8 @@ export class Layer {
     const keys = this.keys;
     const index = keys.findIndex(k => param === k.name);
 
+    type PMiddleware = Middleware & {param?: string};
+
     if (~index) {
       const middleware = async function(ctx, next) {
         const u = await handler(ctx.state.params[param], ctx);
@@ -263,15 +233,27 @@ export class Layer {
           ctx.state.params[param] = u;
         }
 
-        await next();
-      } as Middleware;
+        return next();
+      } as PMiddleware;
+      middleware.param = param;
+
+      // iterate through the stack to figure out where to place the handler
+      for (const [insert, handler] of this.stack.entries()) {
+        // parameter setters are always first, so when we find a handler w/o a param property, stop there
+        // with other setters, we look for any parameter further back in the stack, to insert it before them
+        if (!(handler as PMiddleware).param || keys.findIndex(k => (handler as PMiddleware).param  === k.name) > index) {
+          stack.splice(insert, 0, middleware);
+          break;
+        }
+
+      }
     }
 
     return this;
   }
 
   use(handle: Middleware): this {
-    if ('function' === typeof handle) {
+    if ('function' === typeof handle && handle.length > 0 && handle.length < 3) {
       this.stack.push(handle);
     }
 
@@ -280,7 +262,6 @@ export class Layer {
 
   callback(): Middleware {
     return (ctx, next) => {
-      // Sorted by resources used when testing
       if (!this.method(ctx.method)) {
         return next();
       }
@@ -297,13 +278,22 @@ export class Layer {
 
       if (!(ctx.state.layers instanceof Array)) {
         ctx.state.layers = [] as ContextStateLayerEntry[];
+        // add getter for last layer
         Reflect.defineProperty(ctx.state, 'layer', {
           configurable: false,
           enumerable: false,
           get() {
             return ctx.state.layers[0];
           }
-        })
+        });
+      }
+
+      // set preffered reponse MIME
+      if (accepted instanceof Array) {
+        ctx.state.preffered = accepted[0];
+      // Or empty if not set
+      } else if ('string' !== typeof ctx.state.preffered) {
+        ctx.state.preffered = '';
       }
 
       ctx.state.layers.push({
