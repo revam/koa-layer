@@ -137,6 +137,11 @@ export class Layer {
       }
     }
 
+    // Add head if GET is present, disregarding if previous added.
+    if (this.methods.has('GET')) {
+      this.methods.add('HEAD');
+    }
+
     for (const fn of this.stack) {
       const type = typeof fn;
 
