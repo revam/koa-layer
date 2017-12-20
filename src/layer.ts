@@ -294,12 +294,12 @@ export class Layer {
           configurable: false,
           enumerable: false,
           get() {
-            return ctx.state.layers[0];
+            return ctx.state.layers[ctx.state.layers.length - 1];
           }
         });
       }
 
-      // set preffered reponse MIME
+      // set preffered response MIME
       if (accepted instanceof Array) {
         ctx.state.preffered = accepted[0];
       // Or empty if not set
