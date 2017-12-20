@@ -288,7 +288,7 @@ export class Layer {
         });
       }
 
-      // set preffered reponse MIME
+      // set preffered response MIME
       if (accepted instanceof Array) {
         ctx.state.preffered = accepted[0];
       // Or empty if not set
