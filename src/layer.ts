@@ -283,7 +283,7 @@ export class Layer {
           configurable: false,
           enumerable: false,
           get() {
-            return ctx.state.layers[0];
+            return ctx.state.layers[ctx.state.layers.length - 1];
           }
         });
       }
