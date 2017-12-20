@@ -43,6 +43,7 @@ export interface LayerOptions {
   accepts?: string|Iterable<string>|IterableIterator<string>;
   handler?: Middleware;
   handlers?: Middleware|Iterable<Middleware>|IterableIterator<Middleware>;
+  conditional?: (ctx: Context) => Promise<boolean>|boolean;
 }
 
 export class Layer {
@@ -52,6 +53,7 @@ export class Layer {
   public methods: Set<string>;
   public accepts: Set<string>;
   public stack: Middleware[];
+  private conditional?: (ctx: Context) => Promise<boolean>|boolean;
 
   public readonly no_params: boolean;
   public readonly single_star: boolean;
@@ -134,6 +136,11 @@ export class Layer {
             this.stack.push(handler)
           }
         }
+      }
+
+      // Conditional execution
+      if ('function' === typeof options.conditional) {
+        this.conditional = options.conditional;
       }
     }
 
@@ -261,7 +268,11 @@ export class Layer {
   }
 
   callback(): Middleware {
-    return (ctx, next) => {
+    return async(ctx, next) => {
+      if (this.conditional && !(await this.conditional(ctx))) {
+        return next();
+      }
+
       if (!this.method(ctx.method)) {
         return next();
       }
