@@ -36,7 +36,7 @@ export interface ContextStateLayerEntry {
 
 export interface LayerOptions {
   path?: string;
-  parse_options?: convert.ParseOptions;
+  parse_options?: convert.RegExpOptions;
   method?: string;
   methods?: string|Iterable<string>|IterableIterator<string>;
   accept?: string;
