@@ -198,7 +198,7 @@ export class Layer {
 
     let i = 0;
     for (const capture of captures) {
-      params.set(this.keys[i++].name, capture? safeDecodeURIComponent(capture) : capture)
+      params.set(this.keys[i++].name.toString(), capture? safeDecodeURIComponent(capture) : capture)
     }
 
     return params;
@@ -313,13 +313,13 @@ export class Layer {
         layer: this,
       } as ContextStateLayerEntry);
 
-      if (!(ctx.state.params instanceof Map)) {
-        ctx.state.params = new Map<string|number, any>();
+      if ('object' !== typeof ctx.params) {
+        ctx.params = {};
       }
 
       if (params instanceof Map) {
         for (const [k, v] of params) {
-          ctx.state.params.set(k, v);
+          ctx.params[k] = v;
         }
       }
 
