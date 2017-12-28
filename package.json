@@ -7,7 +7,8 @@
   "scripts": {
     "test": "ts-mocha tests/**/*.test.ts",
     "build": "tsc -p .",
-    "install": "npm run build"
+    "prepublish": "tsc -p . --sourceMap false",
+    "postpublish": "del-cli dist"
   },
   "author": "Mikal Stordal <mikalstordal@gmail.com>",
   "license": "MIT",
@@ -32,6 +33,7 @@
     "@types/mocha": "^2.2.43",
     "@types/node": "^8.0.46",
     "@types/path-to-regexp": "^1.7.0",
+    "del-cli": "^1.1.0",
     "mocha": "^4.0.1",
     "ts-mocha": "^1.0.3",
     "typescript": "^2.6.1"
