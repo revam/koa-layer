@@ -268,23 +268,23 @@ export class Layer {
   }
 
   callback(): Middleware {
-    return async(ctx, done) => {
+    return async(ctx, next) => {
       if (this.conditional && !(await this.conditional(ctx))) {
-        return done();
+        return next();
       }
 
       if (!this.method(ctx.method)) {
-        return done();
+        return next();
       }
 
       const params = this.match(ctx.path);
       if (!params) {
-        return done();
+        return next();
       }
 
       const accepted = this.accept(ctx.headers['accept']);
       if (!accepted) {
-        return done();
+        return next();
       }
 
       if (!(ctx.state.layers instanceof Array)) {
@@ -321,13 +321,6 @@ export class Layer {
         for (const [k, v] of params) {
           ctx.params[k] = v;
         }
-      }
-
-      // Pop state.layers when finished
-      const next = function next() {
-        ctx.state.layers.pop();
-
-        return done();
       }
 
       return compose(this.stack)(ctx, next);
