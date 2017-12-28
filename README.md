@@ -41,17 +41,18 @@ const layer = new Layer({
   /* pick and choose from above */
 })
 
-// it is possible to append handlers after creation
+// you can append handlers after creation
 layer.use((ctx, next) => next());
 
-// layer.param() makes it easier to get data
+// layer.param() makes it easier to set data
 new Layer({path: 'users/:user'}).param('user', async(id, ctx) => await UserTable.getById(id));
 
 // we store some data in ctx.state, as it may be useful when debugging
 layer.use(async(ctx) => {
-  // Most recent layer
-  ctx.state.layer // -> ctx.state.layers[0]
-  // All layers in an array
+  // Getter for last layer
+  ctx.state.layer // -> ctx.state.layers[ctx.state.layers.length - 1];
+
+  // Ancestor layer data till we reached here
   ctx.state.layers = [{
     accepted: [{
       type, // string
@@ -64,13 +65,19 @@ layer.use(async(ctx) => {
     params, // Map<string|number, any>
     layer, // Layer
   }];
+
   // Preffered content-type for response, only available when provided with 'accept' and/or 'accepts'.
-  ctx.state.preffered // string
+  ctx.state.preffered? // string
+
   // ALL parameters collected till we reached this layer.
-  ctx.state.params // Map<string|number, any>
+  ctx.params // Map<string|number, any>
 });
 
-// supply the callback handler to koa
+// supply the callback to koa
 app.use(layer.callback());
 
 ```
+
+## Typescript
+
+Inludes type definations in [index.d.ts](./dist/index.d.ts)
