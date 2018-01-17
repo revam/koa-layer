@@ -9,11 +9,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Added
 
+- New middleware [method_not_allowed](./README.md)
 - Changelog
 
 ### Changed
 
-- Allow multiple handler in [Layer#use()]()
+- Added/removed properties to/from [ContextStateLayerEntry](./README.md)
+- Allow multiple handlers in [Layer#use()](./README.md)
 
 ## [1.2.1] - 2017-12-28
 
