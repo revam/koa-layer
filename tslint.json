@@ -23,7 +23,10 @@
     ],
 
     // TODO: Enable these
+    "newline-per-chained-call": false,
+
     "completed-docs": false,
+    "no-bitwise": false,
     "no-any": false,
     "no-magic-numbers": false,
     "no-implicit-dependencies": [true, "dev"],

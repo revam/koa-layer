@@ -7,21 +7,19 @@
  */
 
 /**
- * accepts.ts
+ * src/accepts.ts
  *
  * Inspired by [negotiator](https://www.npmjs.com/package/negotiator).
  *
- * Copyright (c) 2017 Mikal Stordal <mikalstordal@gmail.com>
+ * Copyright (c) 2017-2018 Mikal Stordal <mikalstordal@gmail.com>
  * MIT Licensed
  */
 
-'use strict';
-
 export enum MatchingFlag {
-  NONE,
-  PARAMS,
-  SUBTYPE,
-  TYPE,
+  NONE = 0,
+  PARAMS = 1,
+  SUBTYPE = 2,
+  TYPE = 4,
 }
 
 export interface ParsedHeader {
@@ -36,13 +34,17 @@ export interface ParsedHeader {
 }
 
 const matchSingleRegex = /^([\w-+*]+)\/([\w-+*]+)$/;
-export function accepts(header: string, provided?: Iterable<string>|IterableIterator<string>): ParsedHeader[] {
+export function accepts(header: string, provided?: Iterable<string> | IterableIterator<string>): ParsedHeader[] {
   const accepted = Array.from(parseHeader(header));
 
   if ('object' === typeof provided && Reflect.has(provided, Symbol.iterator)) {
     let i = 0;
     // Parse item and get priority
-    return Array.from(iterableMap(provided, p => priority(parseItem(matchSingleRegex.exec(p.trim()), i++, 0), accepted)))
+    return Array
+      .from(iterableMap(
+        provided,
+        (p) => priority(parseItem(matchSingleRegex.exec(p.trim()), i++, 0), accepted),
+      ))
       .filter(isQuality)
       .sort(compareSpecs);
   }
@@ -50,11 +52,6 @@ export function accepts(header: string, provided?: Iterable<string>|IterableIter
   return accepted
     .filter(isQuality)
     .sort(compareSpecs);
-}
-
-export function preffered(header: string, provided?: Iterable<string>|IterableIterator<string>): string|false {
-  const filtered = accepts(header, provided);
-  return filtered.length? filtered[0].full_type : false;
 }
 
 const matchMultiRegex = /(?=\s*)([\w-+*]+)\/([\w-+*]+)\s*(?:;([^]*?))?(?=,\s*[\w-+*]+\/|$)/g;
@@ -70,7 +67,7 @@ function* parseHeader(header: string): IterableIterator<ParsedHeader> {
   while (match);
 }
 
-function parseItem([,type, sub_type, param_string]: string[], index: number, quality: number = 1): ParsedHeader {
+function parseItem([, type, sub_type, param_string]: string[], index: number, quality: number = 1): ParsedHeader {
   const full_type = `${type}/${sub_type}`;
   const params = splitParameters(param_string);
 
@@ -80,21 +77,21 @@ function parseItem([,type, sub_type, param_string]: string[], index: number, qua
   }
 
   return {
-    type,
-    sub_type,
-    full_type,
-    quality,
-    params,
     flags: 0,
-    index
-  }
+    full_type,
+    index,
+    params,
+    quality,
+    sub_type,
+    type,
+  };
 }
 
 function priority(item: ParsedHeader, ref: ParsedHeader[]): ParsedHeader {
   item.other_index = -1;
 
   for (const accepted of ref) {
-    let flag = flagItem(item, accepted);
+    const flag = flagItem(item, accepted);
 
     // We have a flag
     if (undefined !== flag
@@ -118,28 +115,22 @@ function priority(item: ParsedHeader, ref: ParsedHeader[]): ParsedHeader {
 
 function flagItem(item: ParsedHeader, ref: ParsedHeader): MatchingFlag {
   let flag = MatchingFlag.NONE;
-  if (ref.type.toLowerCase() == item.type.toLowerCase()) {
+  if (ref.type.toLowerCase() === item.type.toLowerCase()) {
     flag |= MatchingFlag.TYPE;
-  }
-
-  else if (ref.type != '*') {
+  } else if (ref.type !== '*') {
     return;
   }
 
-  if (ref.sub_type.toLowerCase() == item.sub_type.toLowerCase()) {
+  if (ref.sub_type.toLowerCase() === item.sub_type.toLowerCase()) {
     flag |= MatchingFlag.SUBTYPE;
-  }
-
-  else if (ref.sub_type != '*') {
+  } else if (ref.sub_type !== '*') {
     return;
   }
 
   if (ref.params.size) {
-    if (iterableEvery(ref.params, ([k, v]) => v == '*' || v.toLowerCase() == (item.params[k]||'').toLowerCase())) {
+    if (iterableEvery(ref.params, ([k, v]) => v === '*' || v.toLowerCase() === (item.params[k] || '').toLowerCase())) {
       flag |= MatchingFlag.PARAMS;
-    }
-
-    else {
+    } else {
       return;
     }
   }
@@ -149,7 +140,7 @@ function flagItem(item: ParsedHeader, ref: ParsedHeader): MatchingFlag {
 
 const splitRegex = /^([^=]+)=("?)([^]*?)("?)$/;
 function splitParameters(params_string?: string): Map<string, string> {
-  const params = new Map;
+  const params = new Map();
 
   // No parameters provided
   if ('string' !== typeof params_string) {
@@ -164,22 +155,21 @@ function splitParameters(params_string?: string): Map<string, string> {
     const match = param_part.match('"');
     if (!match || match.length % 2 === 0) {
       param_array[i++] = param_part;
-    }
-    // Odd number of quots
-    else {
+    // Odd number of quotes
+    } else {
       param_array[i] += `;${param_part}`;
     }
   }
 
   // Read params
   for (const param of param_array) {
-    const [,key, q1, value, q2] = splitRegex.exec(param.trim());
+    const [, key, q1, value, q2] = splitRegex.exec(param.trim());
 
     if (!key) {
       continue;
     }
 
-    params.set(key.toLowerCase(), q1==q2? value : q1+value+q2+'');
+    params.set(key.toLowerCase(), q1 === q2 ? value : `${q1}${value}${q2}`);
   }
 
   return params;
