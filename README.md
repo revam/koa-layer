@@ -78,6 +78,10 @@ app.use(layer.callback());
 
 ```
 
+## Changelog
+
+See [CHANGELOG.md](./CHANGELOG.md).
+
 ## Typescript
 
 Inludes type definations in [index.d.ts](./dist/index.d.ts)
