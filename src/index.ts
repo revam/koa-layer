@@ -25,14 +25,17 @@ declare module "koa" {
   }
 }
 
+const head_or_get = new Set(['HEAD', 'GET']);
+
 export { MatchingFlag, ParsedHeader } from './accepts';
 
 export type ParameterMiddleware<T = any> = (param_value: string, ctx: Context) => Promise<T | undefined>;
 
 export interface ContextStateLayerEntry {
   accepted?: ParsedHeader[];
-  done: boolean;
+  index: number;
   layer: Layer;
+  length: number;
   match: boolean;
   params?: Map<string | number, any>;
 }
@@ -51,15 +54,15 @@ export interface LayerOptions {
 
 export class Layer {
   public readonly path: string;
-  private regexp: RegExp;
   public keys: convert.Key[];
   public methods: Set<string>;
   public accepts: Set<string>;
   public stack: Middleware[];
-  private conditional?: (ctx: Context) => Promise<boolean> | boolean;
-
   public readonly no_params: boolean;
   public readonly single_star: boolean;
+
+  private conditional?: (ctx: Context) => Promise<boolean> | boolean;
+  private regexp: RegExp;
 
   constructor(options?: LayerOptions) {
     this.keys = [];
@@ -305,12 +308,13 @@ export class Layer {
 
       const layers = ctx.state.layers as ContextStateLayerEntry[];
 
-      function skip(opts: {accepted?: ParsedHeader[]; params?: Map<string | number, any>} = {}) {
+      function skip(params?: Map<string | number, any>) {
         layers.push({
-          done: true,
+          index: layers.length,
           layer: this,
+          length: 0,
           match: false,
-          ...opts,
+          params,
         });
 
         return next();
@@ -320,11 +324,11 @@ export class Layer {
         ctx.params = {};
       }
 
-      if (this.conditional && !(await this.conditional(ctx))) {
+      if (!this.method(ctx.method)) {
         return skip();
       }
 
-      if (!this.method(ctx.method)) {
+      if (this.conditional && !(await this.conditional(ctx))) {
         return skip();
       }
 
@@ -335,14 +339,15 @@ export class Layer {
 
       const accepted = this.accept(ctx.headers.accept);
       if (!accepted) {
-        return skip({params});
+        return skip(params);
       }
 
-      // Store index
+      // Save index for later
       const index = layers.push({
         accepted,
-        done: false,
+        index: layers.length,
         layer: this,
+        length: -1,
         match: true,
         params,
       }) - 1;
@@ -354,7 +359,7 @@ export class Layer {
       }
 
       return compose(this.stack)(ctx, () => {
-        layers[index].done = true;
+        layers[index].length = layers.length - index - 1;
 
         return next();
       });
@@ -365,30 +370,72 @@ export class Layer {
     return new Layer(options).callback();
   }
 
+  /**
+   * Checks if current method is allowed.
+   * `HEAD` and `GET` will not be checked.
+   *
+   * A simple graph to show how it works
+   *
+   *      R <- Entry point
+   *      |
+   *      | <- Can be any amount of middleware
+   *      |    in these pipes.
+   *      L
+   *     / \
+   *    O   | <- Will not be checked
+   *        |
+   *        * <- Our middleware - Checks all layers
+   *        |    down the chain.
+   *        |
+   *        L <- Layers
+   *       / \
+   *      /   L
+   *     |   / \     If placed here than only next
+   *     |  L   * <- endpoint will be checked.
+   *     | / \   \
+   *     |/   L   O <- Endpoints
+   *     |   / \
+   *      \ /   O
+   *       O
+   *
+   * @param ctx Koa Context
+   * @param next start next middleware
+   */
   public static async method_not_allowed(ctx: Context, next: () => Promise<any>): Promise<any> {
     await next();
 
+    if (ctx.headerSent || ctx.body || ctx.status !== 404 || head_or_get.has(ctx.method)) {
+      return;
+    }
+
     const layers = ctx.state.layers as ContextStateLayerEntry[];
 
+    let skip = 0;
     let allowed = true;
-    for (const {layer, done, match} of layers) {
-      // Skip inactive matched layers.
-      if (match && done) {
+    for (const {layer, index, length} of layers) {
+      // We're skipping this shit.
+      if (skip) {
+        skip--;
         continue;
       }
 
+      // Check layer for unallowed methods
       if (!layer.method(ctx.method)) {
         allowed = false;
         break;
       }
+
+      // Skip child layers of all except the tailing layers.
+      if (length > 0 && index + length < layers.length) {
+        skip = length;
+      }
     }
 
-    // Skip the rest.
-    if (ctx.headerSent || allowed) {
+    if (allowed) {
       return;
     }
 
-    ctx.status = 405;
+    ctx.status = ctx.req.httpVersion === '1.0' ? 400 : 405;
     ctx.body = `Method '${ctx.method}' not allowed.`;
   }
 }
