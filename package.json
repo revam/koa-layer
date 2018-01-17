@@ -47,12 +47,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/revam/koa-layer.git"
+    "url": "git+https://github.com/revam/koa-match.git"
   },
   "bugs": {
-    "url": "https://github.com/revam/koa-layer/issues"
+    "url": "https://github.com/revam/koa-match/issues"
   },
-  "homepage": "https://github.com/revam/koa-layer#readme",
+  "homepage": "https://github.com/revam/koa-match#readme",
   "jest": {
     "transform": {
       "^.+\\.tsx?$": "ts-jest"
