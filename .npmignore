@@ -7,7 +7,7 @@ yarn-error.log*
 
 # Ignore source code
 src
-tests
+test
 
 # Runtime data
 pids
@@ -60,3 +60,9 @@ typings/
 
 # dotenv environment variables file
 .env
+
+# Typescript config files
+ts*.json
+
+# VS Code settings
+.vscode/

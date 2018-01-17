@@ -1,14 +1,17 @@
 {
   "name": "koa-match",
   "version": "1.2.1",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
   "description": "A small matching library for Koa.",
   "scripts": {
-    "test": "ts-mocha tests/**/*.test.ts",
+    "lint": "tsc --noEmit -p . && tslint src/**/*.ts",
+    "test": "jest",
     "build": "tsc -p .",
-    "prepublish": "tsc -p . --sourceMap false",
-    "postpublish": "del-cli dist"
+    "pretest": "npm run lint",
+    "prebuild": "npm run test",
+    "prepublish": "npm run build",
+    "postpublish": "del-cli lib"
   },
   "author": "Mikal Stordal <mikalstordal@gmail.com>",
   "license": "MIT",
@@ -27,15 +30,16 @@
     "path-to-regexp": "^2.1.0"
   },
   "devDependencies": {
+    "@types/jest": "^22.0.1",
     "@types/koa": "^2.0.39",
     "@types/koa-compose": "^3.2.2",
     "@types/mime-types": "^2.1.0",
-    "@types/mocha": "^2.2.43",
     "@types/node": "^8.0.46",
     "@types/path-to-regexp": "^1.7.0",
     "del-cli": "^1.1.0",
-    "mocha": "^4.0.1",
-    "ts-mocha": "^1.0.3",
+    "jest": "^22.1.1",
+    "ts-jest": "^22.0.1",
+    "tslint": "^5.9.1",
     "typescript": "^2.6.1"
   },
   "directories": {
@@ -48,5 +52,15 @@
   "bugs": {
     "url": "https://github.com/revam/koa-layer/issues"
   },
-  "homepage": "https://github.com/revam/koa-layer#readme"
+  "homepage": "https://github.com/revam/koa-layer#readme",
+  "jest": {
+    "transform": {
+      "^.+\\.tsx?$": "ts-jest"
+    },
+    "testRegex": "(/__tests__/.*|(\\.|/)(test|spec))\\.tsx?$",
+    "moduleFileExtensions": [
+      "ts",
+      "tsx"
+    ]
+  }
 }
