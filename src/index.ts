@@ -261,9 +261,11 @@ export class Layer {
     return this;
   }
 
-  public use(handle: Middleware) {
-    if ('function' === typeof handle && handle.length > 0 && handle.length < 3) {
-      this.stack.push(handle);
+  public use(handle: Middleware);
+  public use(...handles: Middleware[]);
+  public use(...handles: Middleware[]) {
+    if (handles.every((handle) => 'function' === typeof handle && handle.length > 0 && handle.length < 3)) {
+      this.stack.push(...handles);
     }
 
     return this;
