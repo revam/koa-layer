@@ -211,11 +211,7 @@ export class Layer {
     return !this.methods.size || this.methods.has(method);
   }
 
-  private accept(header: string): ParsedHeader[] {
-    if (!header) {
-      return;
-    }
-
+  private accept(header?: string): ParsedHeader[] {
     if (!this.accepts.size) {
       return [];
     }
@@ -308,7 +304,7 @@ export class Layer {
 
       const layers = ctx.state.layers as ContextStateLayerEntry[];
 
-      function skip(params?: Map<string | number, any>) {
+      const skip = (params?: Map<string | number, any>) => {
         layers.push({
           index: layers.length,
           layer: this,
@@ -318,7 +314,7 @@ export class Layer {
         });
 
         return next();
-      }
+      };
 
       if ('object' !== typeof ctx.params) {
         ctx.params = {};

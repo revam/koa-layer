@@ -15,6 +15,9 @@
  * MIT Licensed
  */
 
+// from packages
+import * as isIterable from 'is-iterable';
+
 export enum MatchingFlag {
   NONE = 0,
   PARAMS = 1,
@@ -34,10 +37,13 @@ export interface ParsedHeader {
 }
 
 const matchSingleRegex = /^([\w-+*]+)\/([\w-+*]+)$/;
-export function accepts(header: string, provided?: Iterable<string> | IterableIterator<string>): ParsedHeader[] {
-  const accepted = Array.from(parseHeader(header));
+export function accepts(
+  header: string = '*/*',
+  provided?: Iterable<string> | IterableIterator<string>,
+): ParsedHeader[] {
+  const accepted = parseHeader(header);
 
-  if ('object' === typeof provided && Reflect.has(provided, Symbol.iterator)) {
+  if (isIterable(provided)) {
     let i = 0;
     // Parse item and get priority
     return Array
@@ -49,7 +55,7 @@ export function accepts(header: string, provided?: Iterable<string> | IterableIt
       .sort(compareSpecs);
   }
 
-  return accepted
+  return Array.from(accepted)
     .filter(isQuality)
     .sort(compareSpecs);
 }
@@ -87,7 +93,7 @@ function parseItem([, type, sub_type, param_string]: string[], index: number, qu
   };
 }
 
-function priority(item: ParsedHeader, ref: ParsedHeader[]): ParsedHeader {
+function priority(item: ParsedHeader, ref: Iterable<ParsedHeader>): ParsedHeader {
   item.other_index = -1;
 
   for (const accepted of ref) {
