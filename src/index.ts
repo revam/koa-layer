@@ -8,45 +8,45 @@
  * MIT Licensed
  */
 
-import * as compose from 'koa-compose';
-import * as convert from 'path-to-regexp';
+// from packages
 import * as isIterable from 'is-iterable';
-import {lookup} from 'mime-types';
-import {accepts, preffered, ParsedHeader} from './accepts';
-
-import {Middleware, Context} from 'koa';
+import { Context, Middleware } from 'koa';
+import * as compose from 'koa-compose';
+import { lookup } from 'mime-types';
+import * as convert from 'path-to-regexp';
+// from library
+import { accepts, ParsedHeader } from './accepts';
 
 declare module "koa" {
   interface Context {
     params: {
-      [param: string]: any
-    }
+      [param: string]: any;
+    };
   }
 }
 
+export { MatchingFlag, ParsedHeader } from './accepts';
 
-export { accepts, preffered } from './accepts';
-
-export interface ParameterMiddleware<T = any> {
-  (param_value: string, ctx: Context): Promise<T|undefined>;
-}
+export type ParameterMiddleware<T = any> = (param_value: string, ctx: Context) => Promise<T | undefined>;
 
 export interface ContextStateLayerEntry {
-  params: true|Map<string|number, any>;
-  accepted: true|ParsedHeader[]
-  layer: Layer
+  accepted?: ParsedHeader[];
+  done: boolean;
+  layer: Layer;
+  match: boolean;
+  params?: Map<string | number, any>;
 }
 
 export interface LayerOptions {
   path?: string;
   parse_options?: convert.RegExpOptions;
   method?: string;
-  methods?: string|Iterable<string>|IterableIterator<string>;
+  methods?: string | Iterable<string> | IterableIterator<string>;
   accept?: string;
-  accepts?: string|Iterable<string>|IterableIterator<string>;
+  accepts?: string | Iterable<string> | IterableIterator<string>;
   handler?: Middleware;
-  handlers?: Middleware|Iterable<Middleware>|IterableIterator<Middleware>;
-  conditional?: (ctx: Context) => Promise<boolean>|boolean;
+  handlers?: Middleware | Iterable<Middleware> | IterableIterator<Middleware>;
+  conditional?(ctx: Context): Promise<boolean> | boolean;
 }
 
 export class Layer {
@@ -56,7 +56,7 @@ export class Layer {
   public methods: Set<string>;
   public accepts: Set<string>;
   public stack: Middleware[];
-  private conditional?: (ctx: Context) => Promise<boolean>|boolean;
+  private conditional?: (ctx: Context) => Promise<boolean> | boolean;
 
   public readonly no_params: boolean;
   public readonly single_star: boolean;
@@ -64,8 +64,8 @@ export class Layer {
   constructor(options?: LayerOptions) {
     this.keys = [];
     this.stack = [];
-    this.methods = new Set;
-    this.accepts = new Set;
+    this.methods = new Set();
+    this.accepts = new Set();
 
     if ('object' === typeof options) {
       // Path and RegExp
@@ -92,35 +92,33 @@ export class Layer {
 
       if ('string' === typeof options.methods) {
         this.methods.add(options.methods.toUpperCase());
-      }
-
-      else if (isIterable(options.methods)) {
+      } else if (isIterable(options.methods)) {
         for (const method of options.methods) {
           if ('string' === typeof method) {
-            this.methods.add(method.toUpperCase())
+            this.methods.add(method.toUpperCase());
           }
         }
       }
 
       // Content types accepted
-      const accepts: string[] = [];
+      const accept_canidates: string[] = [];
       if ('string' === typeof options.accept) {
-        accepts.push(options.accept);
+        accept_canidates.push(options.accept);
       }
 
       if ('string' === typeof options.accepts) {
-        accepts.push(options.accepts);
-      }
-
-      else if (isIterable(options.accepts)) {
+        accept_canidates.push(options.accepts);
+      } else if (isIterable(options.accepts)) {
         for (const accept of options.accepts) {
           if ('string' === typeof accept) {
-            accepts.push(accept)
+            accept_canidates.push(accept);
           }
         }
       }
 
-      for (const accepted of accepts.map(t => !t.includes('/')? lookup(t):t).filter(t => 'string' === typeof t) as string[]) {
+      for (const accepted of accept_canidates
+        .map((t) => !t.includes('/') ? lookup(t) : t)
+        .filter((t) => 'string' === typeof t) as string[]) {
         this.accepts.add(accepted);
       }
 
@@ -131,12 +129,10 @@ export class Layer {
 
       if ('function' === typeof options.handlers) {
         this.stack.push(options.handlers);
-      }
-
-      else if (isIterable(options.handlers)) {
+      } else if (isIterable(options.handlers)) {
         for (const handler of options.handlers) {
           if ('function' === typeof handler) {
-            this.stack.push(handler)
+            this.stack.push(handler);
           }
         }
       }
@@ -156,7 +152,8 @@ export class Layer {
       const type = typeof fn;
 
       if ('function' !== type) {
-        throw new Error(`${Array.from(this.methods).toString()}, '${this.path}': middleware must be a funciton, not type '${type}'`);
+        throw new Error(
+          `${Array.from(this.methods).toString()}, '${this.path}': middleware must be a funciton, not type '${type}'`);
       }
     }
 
@@ -165,16 +162,16 @@ export class Layer {
     this.no_params = !this.single_star && !this.keys.length;
   }
 
-  private match(path: string): boolean|Map<string|number, any> {
+  private match(path: string): Map<string | number, any> {
+    const params = new Map<string | number, any>();
+
     // no path configured
     if (!this.path) {
-      return true;
+      return params;
     }
 
-    const params = new Map<string|number, any>();
-
     if (!path) {
-      return false;
+      return;
     }
 
     if ('/' !== path[0]) {
@@ -189,19 +186,19 @@ export class Layer {
     }
 
     if (!this.regexp.test(path)) {
-      return false;
+      return;
     }
 
     // fast match for any path *not* containing any params
     if (this.no_params) {
-      return true;
+      return params;
     }
 
     const captures = this.regexp.exec(path).slice(1);
 
     let i = 0;
     for (const capture of captures) {
-      params.set(this.keys[i++].name.toString(), capture? safeDecodeURIComponent(capture) : capture)
+      params.set(this.keys[i++].name.toString(), capture ? safeDecodeURIComponent(capture) : capture);
     }
 
     return params;
@@ -211,32 +208,31 @@ export class Layer {
     return !this.methods.size || this.methods.has(method);
   }
 
-  private accept(header: string): boolean|ParsedHeader[] {
+  private accept(header: string): ParsedHeader[] {
     if (!header) {
-      return false;
+      return;
     }
 
     if (!this.accepts.size) {
-      return true;
+      return [];
     }
 
-    const filtered = accepts(header, this.accepts);
-    return filtered.length? filtered : false;
+    return accepts(header, this.accepts);
   }
 
-  param<T>(param: string, handler: ParameterMiddleware<T>): this {
+  public param<T>(param: string, handler: ParameterMiddleware<T>): this {
     if ('string' !== typeof param) {
-      throw 'invalid param';
+      throw new Error('invalid param');
     }
 
     const stack = this.stack;
     const keys = this.keys;
-    const index = keys.findIndex(k => param === k.name);
+    const index = keys.findIndex((k) => param === k.name);
 
     type PMiddleware = Middleware & {param?: string};
 
     if (~index) {
-      const middleware = async function(ctx, next) {
+      const middleware = (async(ctx, next) => {
         const u = await handler(ctx.state.params[param], ctx);
 
         if (undefined !== u) {
@@ -244,14 +240,17 @@ export class Layer {
         }
 
         return next();
-      } as PMiddleware;
+      }) as PMiddleware;
       middleware.param = param;
 
       // iterate through the stack to figure out where to place the handler
-      for (const [insert, handler] of this.stack.entries()) {
+      for (const [insert, handle] of this.stack.entries()) {
         // parameter setters are always first, so when we find a handler w/o a param property, stop there
         // with other setters, we look for any parameter further back in the stack, to insert it before them
-        if (!(handler as PMiddleware).param || keys.findIndex(k => (handler as PMiddleware).param  === k.name) > index) {
+        if (
+          !(handle as PMiddleware).param ||
+          keys.findIndex((k) => (handle as PMiddleware).param  === k.name) > index
+        ) {
           stack.splice(insert, 0, middleware);
           break;
         }
@@ -262,7 +261,7 @@ export class Layer {
     return this;
   }
 
-  use(handle: Middleware): this {
+  public use(handle: Middleware) {
     if ('function' === typeof handle && handle.length > 0 && handle.length < 3) {
       this.stack.push(handle);
     }
@@ -270,69 +269,130 @@ export class Layer {
     return this;
   }
 
-  callback(): Middleware {
+  public callback(): Middleware {
     return async(ctx, next) => {
-      if (this.conditional && !(await this.conditional(ctx))) {
-        return next();
-      }
-
-      if (!this.method(ctx.method)) {
-        return next();
-      }
-
-      const params = this.match(ctx.path);
-      if (!params) {
-        return next();
-      }
-
-      const accepted = this.accept(ctx.headers['accept']);
-      if (!accepted) {
-        return next();
-      }
-
       if (!(ctx.state.layers instanceof Array)) {
-        ctx.state.layers = [] as ContextStateLayerEntry[];
-        // add getter for last layer
+        ctx.state.layers = [];
+
+        // Most recent layer
         Reflect.defineProperty(ctx.state, 'layer', {
           configurable: false,
           enumerable: false,
           get() {
-            return ctx.state.layers[ctx.state.layers.length - 1];
-          }
+            if (ctx.state.layers.length) {
+              return ctx.state.layers[ctx.state.layers.length - 1];
+            }
+          },
+        });
+
+        // Most recent preferred mime type
+        Reflect.defineProperty(ctx.state, 'preferred', {
+          configurable: false,
+          enumerable: false,
+          get() {
+            for (let index = ctx.state.layers.length - 1; index >= 0; index--) {
+              const state = ctx.state.layers[index] as ContextStateLayerEntry;
+
+              if (state.accepted && (state.accepted as ParsedHeader[]).length) {
+                return (state.accepted as ParsedHeader[])[0];
+              }
+            }
+          },
         });
       }
 
-      // set preffered response MIME
-      if (accepted instanceof Array) {
-        ctx.state.preffered = accepted[0];
-      // Or empty if not set
-      } else if ('string' !== typeof ctx.state.preffered) {
-        ctx.state.preffered = '';
-      }
+      const layers = ctx.state.layers as ContextStateLayerEntry[];
 
-      ctx.state.layers.push({
-        params,
-        accepted,
-        layer: this,
-      } as ContextStateLayerEntry);
+      function skip(opts: {accepted?: ParsedHeader[]; params?: Map<string | number, any>} = {}) {
+        layers.push({
+          done: true,
+          layer: this,
+          match: false,
+          ...opts,
+        });
+
+        return next();
+      }
 
       if ('object' !== typeof ctx.params) {
         ctx.params = {};
       }
 
-      if (params instanceof Map) {
+      if (this.conditional && !(await this.conditional(ctx))) {
+        return skip();
+      }
+
+      if (!this.method(ctx.method)) {
+        return skip();
+      }
+
+      const params = this.match(ctx.path);
+      if (!params) {
+        return skip();
+      }
+
+      const accepted = this.accept(ctx.headers.accept);
+      if (!accepted) {
+        return skip({params});
+      }
+
+      // Store index
+      const index = layers.push({
+        accepted,
+        done: false,
+        layer: this,
+        match: true,
+        params,
+      }) - 1;
+
+      if (params instanceof Map && params.size) {
         for (const [k, v] of params) {
           ctx.params[k] = v;
         }
       }
 
-      return compose(this.stack)(ctx, next);
+      return compose(this.stack)(ctx, () => {
+        layers[index].done = true;
+
+        return next();
+      });
+    };
+  }
+
+  public static match(options?: LayerOptions) {
+    return new Layer(options).callback();
+  }
+
+  public static async method_not_allowed(ctx: Context, next: () => Promise<any>): Promise<any> {
+    await next();
+
+    const layers = ctx.state.layers as ContextStateLayerEntry[];
+
+    let allowed = true;
+    for (const {layer, done, match} of layers) {
+      // Skip inactive matched layers.
+      if (match && done) {
+        continue;
+      }
+
+      if (!layer.method(ctx.method)) {
+        allowed = false;
+        break;
+      }
     }
+
+    // Skip the rest.
+    if (ctx.headerSent || allowed) {
+      return;
+    }
+
+    ctx.status = 405;
+    ctx.body = `Method '${ctx.method}' not allowed.`;
   }
 }
 
 export function match(options?: LayerOptions) {
-  return new Layer(options).callback();
+  return Layer.match(options);
 }
 
 /**
@@ -340,7 +400,6 @@ export function match(options?: LayerOptions) {
  * If `decodeURIComponent` error happen, just return the original value.
  *
  * @param component URL decode original string
- * @private
  */
 function safeDecodeURIComponent(component: string): string {
   try {
