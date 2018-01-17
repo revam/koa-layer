@@ -17,8 +17,6 @@
 
 'use strict';
 
-import {iterableMap, iterableEvery} from './helpers';
-
 export enum MatchingFlag {
   NONE,
   PARAMS,
@@ -193,4 +191,43 @@ function isQuality(parsed: ParsedHeader): boolean {
 
 function compareSpecs(a: ParsedHeader, b: ParsedHeader): number {
   return (b.quality - a.quality) || (b.flags - a.flags) || (a.other_index - b.other_index) || (a.index - b.index) || 0;
+}
+
+/**
+ * Test `fn` on every value of `iterable`.
+ *
+ * @param iterable iterable
+ * @param fn result tested as a truthy value.
+ * @param thisArg `this` for `fn`.
+ */
+function iterableEvery<T, U = any>(
+  iterable: Iterable<T> | IterableIterator<T>,
+  fn: (v: T) => boolean,
+  thisArg?: U,
+): boolean {
+  for (const value of iterable) {
+    if (!fn.call(thisArg, value)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Applies `fn` to convert input (`T`) to output (`U`) on call to `next()`.
+ * Returns an new iterator.
+ *
+ * @param iterable iterable
+ * @param fn convert input to output
+ * @param thisArg `this` for `fn`.
+ */
+function* iterableMap<T, U, V = any>(
+  iterable: Iterable<T> | IterableIterator<T>,
+  fn: (v: T) => U,
+  thisArg?: V,
+): IterableIterator<U> {
+  for (const value of iterable) {
+    yield fn.call(thisArg, value);
+  }
 }
