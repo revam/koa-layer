@@ -13,12 +13,12 @@ export interface WaterfallEntry {
     body: string;
     status: number;
   };
-  expected?: number | {
-    status: number;
-    body: string;
+  expected: number | {
+    status?: number;
+    body?: string;
   };
-  path: string;
-  method: string;
+  path?: string;
+  method?: string;
 }
 
 export async function waterfall(
@@ -57,8 +57,8 @@ export async function waterfall(
   // Send requests
   await Promise.all(
     entries.map(async(e) => e.actual = await send({
-      method: e.method,
-      path: e.path,
+      method: (e.method || 'GET').toUpperCase(),
+      path: e.path || '/',
       port,
     })),
   );
