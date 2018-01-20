@@ -5,9 +5,9 @@ import { Layer } from '../src';
 import { waterfall } from './helpers';
 
 /**
- * Test case 1
+ * Test app 1
  *
- * If we accepts GET, we also accepts HEAD.
+ * (If we accept GET, we also accept HEAD)
  *
  *               R <- Entry point
  *               |
@@ -34,7 +34,7 @@ function create_test_app_1() {
     handler: async(ctx) => {
       ctx.body = 'endpoint 1';
     },
-    method: 'DELETE',
+    method: 'delete',
     path: 'endpoint1',
   }));
 
@@ -65,9 +65,12 @@ function create_test_app_1() {
     path: 'endpoint2/:path(.*)?',
   }));
 
-  app.use(async(ctx) => {
-    ctx.body = 'default route';
-  });
+  app.use(Layer.match({
+    handler: async(ctx) => {
+      ctx.body = 'default route';
+    },
+    method: 'get',
+  }));
 
   return app;
 }
@@ -125,8 +128,7 @@ function create_test_app_3() {
 describe('Layer.method_not_allowed', () => {
   const app1 = create_test_app_1();
 
-  // Valid routes
-  it('should ignore get/head requests', async(done) => {
+  it('check default routes for test case 1', async(done) => {
     await waterfall(
       app1.callback(),
       {
@@ -136,6 +138,12 @@ describe('Layer.method_not_allowed', () => {
         },
         method: 'GET',
         path: '/',
+      },
+      {
+        expected: {
+          body: 'default route',
+          status: 200,
+        },
       },
       {
         expected: {
@@ -175,7 +183,7 @@ describe('Layer.method_not_allowed', () => {
           status: 200,
         },
         method: 'POST',
-        path: '/endpoint4/+3',
+        path: '/endpoint2/+3',
       },
     );
 
