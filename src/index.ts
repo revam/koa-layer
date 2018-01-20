@@ -25,8 +25,6 @@ declare module "koa" {
   }
 }
 
-const head_or_get = new Set(['HEAD', 'GET']);
-
 export { MatchingFlag, ParsedHeader } from './accepts';
 
 export type ParameterMiddleware<T = any> = (param_value: string, ctx: Context) => Promise<T | undefined>;
@@ -368,7 +366,11 @@ export class Layer {
 
   /**
    * Checks if current method is allowed.
-   * `HEAD` and `GET` will not be checked.
+   *
+   * Limitations for use:
+   * 1. Does nothing if request is sent.
+   * 2. Neither body nor status code must be set.
+   * 3. `HEAD` and `GET` will not be checked.
    *
    * A simple graph to show how it works
    *
@@ -381,7 +383,8 @@ export class Layer {
    *    O   | <- Will not be checked
    *        |
    *        * <- Our middleware - Checks all layers
-   *        |    down the chain.
+   *        |    down the chain. Can also be paced
+   *        |    last in a chain.
    *        |
    *        L <- Layers
    *       / \
@@ -394,22 +397,26 @@ export class Layer {
    *      \ /   O
    *       O
    *
-   * @param ctx Koa Context
+   * @param ctx koa.Context
    * @param next start next middleware
    */
   public static async method_not_allowed(ctx: Context, next: () => Promise<any>): Promise<any> {
     await next();
 
-    if (ctx.headerSent || ctx.body || ctx.status !== 404 || head_or_get.has(ctx.method)) {
+    if (ctx.headerSent || ctx.body || ctx.status !== 404 || 'GET' === ctx.method || 'HEAD' === ctx.method) {
       return;
     }
 
     const layers = ctx.state.layers as ContextStateLayerEntry[];
 
+    // Not initialized
+    if (!layers) {
+      return;
+    }
+
     let skip = 0;
-    let allowed = true;
+    let not_allowed = false;
     for (const {layer, index, length} of layers) {
-      // We're skipping this shit.
       if (skip) {
         skip--;
         continue;
@@ -417,22 +424,20 @@ export class Layer {
 
       // Check layer for unallowed methods
       if (!layer.method(ctx.method)) {
-        allowed = false;
+        not_allowed = true;
         break;
       }
 
-      // Skip child layers of all except the tailing layers.
+      // Skip all child layers except the tailing layers.
       if (length > 0 && index + length < layers.length) {
         skip = length;
       }
     }
 
-    if (allowed) {
-      return;
+    if (not_allowed) {
+      ctx.status = ctx.req.httpVersion === '1.0' ? 400 : 405;
+      ctx.body = `Method '${ctx.method}' not allowed.`;
     }
-
-    ctx.status = ctx.req.httpVersion === '1.0' ? 400 : 405;
-    ctx.body = `Method '${ctx.method}' not allowed.`;
   }
 }
 
