@@ -1,7 +1,7 @@
 // from packages
 import * as koa from 'koa';
 // from library
-import { Layer } from '../src';
+import { Layer, match, method_not_allowed } from '../src';
 import { waterfall } from './helpers';
 
 /**
@@ -76,25 +76,51 @@ function create_test_app_1() {
 }
 
 /**
- * Test case 2
+ * Test app 2
  *
- *     R <- Entry point
- *     |
- *     L
- *    / \
- *   O   L <- Layers
- *      / \
- *     /   L
- *    |   / \
- *    |  L   * <- Our middleware
- *    | / \   \
- *    |/   L   O <- Endpoints
- *    |   / \
- *     \ /   O
- *      O
+ * (If we accept GET, we also accept HEAD)
+ *
+ *               R <- Entry point
+ *               |
+ *               L - DELETE
+ *              / \
+ *   DELETE -> O   L <- GET,POST
+ *                / \
+ *               |   * <- Our middleware
+ *               |   |
+ *               |   L <- POST
+ *                \ / \
+ *          GET -> O   O <- POST
  */
 function create_test_app_2() {
   const app = new koa();
+
+  app.use(Layer.match({
+    handler: async(ctx) => {
+      ctx.body = 'deleted';
+    },
+    method: 'delete',
+  }));
+
+  app.use(match({
+    handlers: [
+      method_not_allowed,
+      match({
+        handler: (ctx) => {
+          ctx.body = 'post';
+        },
+        method: 'post',
+      }),
+    ],
+    methods: ['get', 'post'],
+  }));
+
+  app.use(match({
+    async handler(ctx) {
+      ctx.body = 'default';
+    },
+    method: 'get',
+  }));
 
   return app;
 }
@@ -188,5 +214,37 @@ describe('Layer.method_not_allowed', () => {
     );
 
     done();
-  }, 300000);
+  });
+
+  it('check default routes for test case 2', async(done) => {
+    await waterfall(
+      app1.callback(),
+      {
+        expected: {
+          body: 'default route',
+          status: 200,
+        },
+        method: 'GET',
+        path: '/',
+      },
+      {
+        expected: {
+          body: 'endpoint 1',
+          status: 200,
+        },
+        method: 'DELETE',
+        path: '/endpoint1',
+      },
+      {
+        expected: {
+          body: 'default route',
+          status: 200,
+        },
+        method: 'GET',
+        path: '/endpoint2',
+      },
+    );
+
+    done();
+  });
 });
