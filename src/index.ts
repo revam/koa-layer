@@ -436,9 +436,9 @@ export class Layer {
   }
 }
 
-export function match(options?: LayerOptions) {
-  return Layer.match(options);
-}
+export const match = Layer.match;
+
+export const method_not_allowed = Layer.method_not_allowed;
 
 /**
  * Safe decodeURIComponent, won't throw any error.
