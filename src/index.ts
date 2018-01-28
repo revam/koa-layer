@@ -30,7 +30,7 @@ export { MatchingFlag, ParsedHeader } from './accepts';
 
 export type ParameterMiddleware<T = any> = (param_value: string, ctx: Context) => Promise<T | undefined>;
 
-export interface MethodNotAllowedOptions {
+export interface CheckMiddlewareOptions {
   throw?: boolean;
   methodNotAllowd?: boolean | (() => any);
   notImplemented?: boolean | (() => any);
@@ -390,7 +390,7 @@ export class Layer {
    * @param ctx koa.Context
    * @param next start next middleware
    */
-  public static method_not_allowed(options: MethodNotAllowedOptions = {}): Middleware {
+  public static check(options: CheckMiddlewareOptions = {}): Middleware {
 
     return async(ctx, next) => {
       await next();
@@ -471,7 +471,7 @@ const default_methods = new Set(['OPTIONS', 'GET', 'HEAD', 'POST', 'PUT', 'PATCH
 
 export const match = Layer.match;
 
-export const method_not_allowed = Layer.method_not_allowed;
+export const check = Layer.check;
 
 /**
  * Safe decodeURIComponent, won't throw any error.

@@ -196,7 +196,7 @@ function create_test_app_3(methods: koa.Middleware, middleware?: koa.Middleware[
 describe('Layer.method_not_allowed', () => {
 
   it('check default routes for test case 1', async(done) => {
-    const app1 = create_test_app_1(Layer.method_not_allowed());
+    const app1 = create_test_app_1(Layer.check());
 
     await waterfall(
       app1.callback(),
@@ -244,7 +244,7 @@ describe('Layer.method_not_allowed', () => {
   });
 
   it('check default routes for test case 2', async(done) => {
-    const app2 = create_test_app_2(Layer.method_not_allowed());
+    const app2 = create_test_app_2(Layer.check());
 
     await waterfall(
       app2.callback(),
@@ -282,8 +282,8 @@ describe('Layer.method_not_allowed', () => {
   });
 
   it('should support 405 Method Not Allowed', async(done) => {
-    const app1 = create_test_app_1(Layer.method_not_allowed());
-    const app3 = create_test_app_3(Layer.method_not_allowed());
+    const app1 = create_test_app_1(Layer.check());
+    const app3 = create_test_app_3(Layer.check());
 
     await waterfall(
       app1.callback(),
@@ -338,7 +338,7 @@ describe('Layer.method_not_allowed', () => {
      */
     const app = new koa();
 
-    app.use(Layer.method_not_allowed());
+    app.use(Layer.check());
 
     app.use(Layer.match({
       handler: async(ctx) => expect(ctx.path).toBe('/123'),
@@ -366,7 +366,7 @@ describe('Layer.method_not_allowed', () => {
     );
 
     await waterfall(
-      create_test_app_3(Layer.method_not_allowed()).callback(),
+      create_test_app_3(Layer.check()).callback(),
       {
         expected: 200,
         method: 'get',
@@ -392,9 +392,9 @@ describe('Layer.method_not_allowed', () => {
   });
 
   it('should respond to OPTIONS', async(done) => {
-    const app1 = create_test_app_1(Layer.method_not_allowed());
-    const app2 = create_test_app_2(Layer.method_not_allowed());
-    const app3 = create_test_app_3(Layer.method_not_allowed());
+    const app1 = create_test_app_1(Layer.check());
+    const app2 = create_test_app_2(Layer.check());
+    const app3 = create_test_app_3(Layer.check());
 
     // Test case 1 uses middleware in top chain.
     await waterfall(
