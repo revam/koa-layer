@@ -31,10 +31,10 @@ export type ParameterMiddleware<T = any> = (param_value: string, ctx: Context) =
 
 export interface ContextStateLayerEntry {
   accepted?: ParsedHeader[];
+  done: boolean;
   index: number;
   layer: Layer;
   length: number;
-  match: boolean;
   params?: Map<string | number, any>;
 }
 
@@ -304,10 +304,10 @@ export class Layer {
 
       const skip = (params?: Map<string | number, any>) => {
         layers.push({
+          done: true,
           index: layers.length,
           layer: this,
           length: 0,
-          match: false,
           params,
         });
 
@@ -337,14 +337,16 @@ export class Layer {
       }
 
       // Save index for later
-      const index = layers.push({
+      const index = layers.length;
+      layers.push({
         accepted,
-        index: layers.length,
+        done: false,
+        index,
         layer: this,
         length: -1,
-        match: true,
         params,
-      }) - 1;
+      });
+      const layer = layers[index];
 
       if (params instanceof Map && params.size) {
         for (const [k, v] of params) {
@@ -352,11 +354,18 @@ export class Layer {
         }
       }
 
-      return compose(this.stack)(ctx, () => {
-        layers[index].length = layers.length - index - 1;
+      await compose(this.stack)(ctx, () => {
+        // Count subsequent layers as own, and set done to true.
+        layer.length = layers.length - index;
+        layer.done = true;
 
         return next();
       });
+
+      // Count remaining layers
+      if (layer.length === -1) {
+        layer.length = layers.length - index;
+      }
     };
   }
 
