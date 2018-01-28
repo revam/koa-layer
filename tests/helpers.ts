@@ -1,6 +1,7 @@
 // from packages
 import {
   createServer,
+  IncomingHttpHeaders,
   IncomingMessage,
   request,
   RequestOptions,
@@ -11,10 +12,12 @@ import { Writable } from 'stream';
 export interface WaterfallEntry {
   actual?: {
     body: string;
+    headers: IncomingHttpHeaders;
     status: number;
   };
-  expected: number | {
+  expected: number | string | string[] | {
     status?: number;
+    allow?: string | string[];
     body?: string;
   };
   path?: string;
@@ -33,7 +36,7 @@ export async function waterfall(
   const {port} = server.address();
 
   function send(options: RequestOptions) {
-    return new Promise<{status: number; body: string}>((resolve) => request(
+    return new Promise<{status: number; body: string; headers: IncomingHttpHeaders}>((resolve) => request(
       {...options, port},
       (res) => {
         const buffers: Buffer[] = [];
@@ -46,6 +49,7 @@ export async function waterfall(
           final() {
             resolve({
               body: Buffer.concat(buffers).toString('utf8'),
+              headers: res.headers,
               status: res.statusCode,
             });
           },
@@ -63,10 +67,28 @@ export async function waterfall(
     })),
   );
 
+  // Stop server
+  await new Promise((resolve) => server.close(resolve));
+
   // Check responses
   for (const {expected, actual} of entries) {
     if ('number' === typeof expected)  {
       expect(actual.status).toBe(expected);
+    } else if ('string' === typeof expected) {
+      expect(actual.body).toBe(expected);
+    } else if (expected instanceof Array) {
+      expect(actual.headers).toHaveProperty('allow');
+      if ('allow' in actual.headers) {
+        const methods = actual.headers.allow instanceof Array ?
+          actual.headers.allow :
+          actual.headers.allow.split(',');
+
+        expect(methods).toHaveLength(expected.length);
+
+        if (methods.length === expected.length) {
+          methods.forEach((method) => expect(expected).toContain(method));
+        }
+      }
     } else if ('object' === typeof expected) {
       if ('string' === typeof expected.body) {
         expect(actual.body).toBe(expected.body);
@@ -75,9 +97,25 @@ export async function waterfall(
       if ('number' === typeof expected.status) {
         expect(actual.status).toBe(expected.status);
       }
+
+      if (expected.allow) {
+        expect(actual.headers).toHaveProperty('allow');
+        if ('allow' in actual.headers) {
+          const methods = actual.headers.allow instanceof Array ?
+            actual.headers.allow :
+            actual.headers.allow.split(',');
+
+          if (expected.allow instanceof Array) {
+            expect(methods).toHaveLength(expected.allow.length);
+
+            if (methods.length === expected.allow.length) {
+              methods.forEach((method) => expect(expected.allow).toContain(method));
+            }
+          } else {
+            expect(methods).toContain(expected.allow);
+          }
+        }
+      }
     }
   }
-
-  // Stop server
-  await new Promise((resolve) => server.close(resolve));
 }
