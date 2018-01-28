@@ -9,6 +9,7 @@
  */
 
 // from packages
+import { MethodNotAllowed, NotImplemented } from 'http-errors';
 import * as isIterable from 'is-iterable';
 import { Context, Middleware } from 'koa';
 import * as compose from 'koa-compose';
@@ -28,6 +29,12 @@ declare module "koa" {
 export { MatchingFlag, ParsedHeader } from './accepts';
 
 export type ParameterMiddleware<T = any> = (param_value: string, ctx: Context) => Promise<T | undefined>;
+
+export interface MethodNotAllowedOptions {
+  throw?: boolean;
+  methodNotAllowd?: boolean | (() => any);
+  notImplemented?: boolean | (() => any);
+}
 
 export interface ContextStateLayerEntry {
   accepted?: ParsedHeader[];
@@ -374,81 +381,93 @@ export class Layer {
   }
 
   /**
-   * Checks if current method is allowed.
+   * Returns separate middleware for responding to `OPTIONS` requests with
+   * an `Allow` header containing the allowed methods, as well as responding
+   * with `405 Method Not Allowed` and `501 Not Implemented` as appropriate.
    *
-   * Limitations for use:
-   * 1. Does nothing if request is sent.
-   * 2. Neither body nor status code must be set.
-   * 3. `HEAD` and `GET` will not be checked.
-   *
-   * A simple graph to show how it works
-   *
-   *      R <- Entry point
-   *      |
-   *      | <- Can be any amount of middleware
-   *      |    in these pipes.
-   *      L
-   *     / \
-   *    O   | <- Will not be checked
-   *        |
-   *        * <- Our middleware - Checks all layers
-   *        |    down the chain. Can also be paced
-   *        |    last in a chain.
-   *        |
-   *        L <- Layers
-   *       / \
-   *      /   L
-   *     |   / \     If placed here than only next
-   *     |  L   * <- endpoint will be checked.
-   *     | / \   \
-   *     |/   L   O <- Endpoints
-   *     |   / \
-   *      \ /   O
-   *       O
+   * (Description copied from koa-router. Me == lazy == true)
    *
    * @param ctx koa.Context
    * @param next start next middleware
    */
-  public static async method_not_allowed(ctx: Context, next: () => Promise<any>): Promise<any> {
-    await next();
+  public static method_not_allowed(options: MethodNotAllowedOptions = {}): Middleware {
 
-    if (ctx.headerSent || ctx.body || ctx.status !== 404 || 'GET' === ctx.method || 'HEAD' === ctx.method) {
-      return;
-    }
+    return async(ctx, next) => {
+      await next();
 
-    const layers = ctx.state.layers as ContextStateLayerEntry[];
-
-    // Not initialized
-    if (!layers) {
-      return;
-    }
-
-    let skip = 0;
-    let not_allowed = false;
-    for (const {layer, index, length} of layers) {
-      if (skip) {
-        skip--;
-        continue;
+      if (ctx.headerSent && !options.throw || !(!ctx.status || ctx.status === 404) || !ctx.state.layers) {
+        return;
       }
 
-      // Check layer for unallowed methods
-      if (!layer.method(ctx.method)) {
-        not_allowed = true;
-        break;
+      const layers = ctx.state.layers as ContextStateLayerEntry[];
+      let methods = new Set<string>(['OPTIONS']);
+      let skip = 0;
+
+      // Add methods and check for 501 Not implemented
+      for (const {layer, index, length, done} of layers) {
+        // Add emthods
+        if (layer.methods.size) {
+          layer.methods.forEach((method) => methods.add(method));
+        }
+
+        // See below.
+        if (skip) {
+          skip--;
+          continue;
+        }
+
+        // Found a 501
+        if (!done && length === 1) {
+          if (options.throw || options.notImplemented) {
+            throw 'function' === typeof options.notImplemented ?
+              options.notImplemented() :
+              new NotImplemented();
+          } else {
+            ctx.body = undefined;
+            ctx.status = 501;
+            ctx.set('Allow', Array.from(methods.size > 1 ? methods : default_methods));
+
+            return;
+          }
+        }
+
+        // Skip all except tailing layers.
+        if (length > 1 && index + length < layers.length) {
+          skip = length - 1;
+        }
       }
 
-      // Skip all child layers except the tailing layers.
-      if (length > 0 && index + length < layers.length) {
-        skip = length;
+      // Set default methods if no methods was added
+      if (methods.size === 1) {
+        methods = default_methods;
       }
-    }
 
-    if (not_allowed) {
-      ctx.status = ctx.req.httpVersion === '1.0' ? 400 : 405;
-      ctx.body = `Method '${ctx.method}' not allowed.`;
-    }
+      // Options
+      if (ctx.method === 'OPTIONS') {
+        ctx.body = '';
+        ctx.status = 200;
+        ctx.set('Allow', Array.from(methods));
+
+        return;
+      }
+
+      // Check for 405 Method not allowed
+      if (!methods.has(ctx.method)) {
+        if (options.throw || options.methodNotAllowd) {
+          throw 'function' === typeof options.methodNotAllowd ?
+            options.methodNotAllowd() :
+            new MethodNotAllowed();
+        } else {
+          ctx.body = undefined;
+          ctx.status = 405;
+          ctx.set('Allow', Array.from(methods));
+        }
+      }
+    };
   }
 }
+
+const default_methods = new Set(['OPTIONS', 'GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE']);
 
 export const match = Layer.match;
 

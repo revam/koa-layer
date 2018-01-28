@@ -1,60 +1,64 @@
 // from packages
 import * as koa from 'koa';
 // from library
-import { Layer, match, method_not_allowed } from '../src';
+import { Layer } from '../src';
 import { waterfall } from './helpers';
 
 /**
  * Test app 1
  *
- * (If we accept GET, we also accept HEAD)
+ *  UPPERCASE  -> method
+ *  have GET?  -> also HEAD
+ * 'in quotes' -> response
  *
- *               R <- Entry point
- *               |
- *     DELETE -> L
- *              / \
- *   DELETE -> O   * <- Our middleware
- *                 |
- *                 L <- GET,POST,PUT
- *                / \
- *               /   L <- PUT
- *              |   / \
- *     GET,POST -> L   O <- PUT
- *              | / \
- *              |/   L <- POST
- *              |   / \
- *               \ /   O <- POST
- *                |
- *                O <- GET
+ *                    R <- entry point
+ *                    |
+ *          DELETE -> L
+ *                   / \
+ *      'delete' -> O   * <- middleware
+ *                      |
+ *                      |    GET,POST,PUT +
+ *                      L <- path.length > 1
+ *                     / \
+ *                    /   L <- PUT
+ *                   |   / \
+ *        GET,POST + -> L   O <- 'put'
+ *   path.length > 2 | / \
+ *                   |/   L <- POST
+ *                   |   / \
+ *                    \ /   O <- 'post'
+ *                     |
+ *                     O <- 'get'
  */
-function create_test_app_1() {
+function create_test_app_1(methods: koa.Middleware, middleware?: koa.Middleware[]) {
   const app = new koa();
+
+  if (middleware && middleware.length) {
+    middleware.forEach((m) => app.use(m));
+  }
 
   app.use(Layer.match({
     handler: async(ctx) => {
-      ctx.body = 'endpoint 1';
+      ctx.body = 'delete';
     },
     method: 'delete',
-    path: 'endpoint1',
   }));
 
-  app.use(Layer.method_not_allowed);
+  app.use(methods);
 
   app.use(Layer.match({
     handlers: [
       Layer.match({
-        conditional: (ctx) => ctx.params.path === '+1',
         handler: async(ctx) => {
-          ctx.body = 'endpoint 2';
+          ctx.body = 'put';
         },
         method: 'put',
       }),
       Layer.match({
-        conditional: (ctx) => ctx.params.path,
+        conditional(ctx) { return ctx.method !== 'GET' || ctx.path.length > 2; },
         handler: Layer.match({
-          conditional: (ctx) => ctx.params.path === '+3',
           handler: (ctx) => {
-            ctx.body = 'endpoint 3';
+            ctx.body = 'post';
           },
           method: 'post',
         }),
@@ -62,12 +66,12 @@ function create_test_app_1() {
       }),
     ],
     methods: ['get' , 'put', 'post'],
-    path: 'endpoint2/:path(.*)?',
+    conditional(ctx) { return ctx.method !== 'GET' || ctx.path.length > 1; },
   }));
 
   app.use(Layer.match({
     handler: async(ctx) => {
-      ctx.body = 'default route';
+      ctx.body = 'get';
     },
     method: 'get',
   }));
@@ -78,34 +82,42 @@ function create_test_app_1() {
 /**
  * Test app 2
  *
+ *  UPPERCASE  -> method
+ *  have GET?  -> also HEAD
+ * 'in quotes' -> response
+ *
  * (If we accept GET, we also accept HEAD)
  *
- *               R <- Entry point
+ *               R <- entry point
  *               |
- *               L - DELETE
+ *               L <- DELETE
  *              / \
  *   DELETE -> O   L <- GET,POST
  *                / \
- *               |   * <- Our middleware
+ *               |   * <- middleware
  *               |   |
  *               |   L <- POST
  *                \ / \
  *          GET -> O   O <- POST
  */
-function create_test_app_2() {
+function create_test_app_2(methods: koa.Middleware, middleware?: koa.Middleware[]) {
   const app = new koa();
+
+  if (middleware && middleware.length) {
+    middleware.forEach((m) => app.use(m));
+  }
 
   app.use(Layer.match({
     handler: async(ctx) => {
-      ctx.body = 'deleted';
+      ctx.body = 'delete';
     },
     method: 'delete',
   }));
 
-  app.use(match({
+  app.use(Layer.match({
     handlers: [
-      method_not_allowed,
-      match({
+      methods,
+      Layer.match({
         handler: (ctx) => {
           ctx.body = 'post';
         },
@@ -115,9 +127,11 @@ function create_test_app_2() {
     methods: ['get', 'post'],
   }));
 
-  app.use(match({
-    async handler(ctx) {
-      ctx.body = 'default';
+  app.use(Layer.match({
+    handler(ctx, next) {
+      ctx.body = 'get';
+
+      return next();
     },
     method: 'get',
   }));
@@ -126,90 +140,103 @@ function create_test_app_2() {
 }
 
 /**
- * Test case 3
- *
- *     R <- Entry point
- *     |
- *     * <- Our middleware
- *     |
- *     L
- *    / \
- *   O   L <- Layers
- *      / \
- *     /   L
- *    |   / \
- *    |  L   O <- Endpoints
- *    | / \
- *    |/   L
- *    |   / \
- *     \ /   O
- *      O
+ *             _ <- entry point
+ *             |
+ *             *
+ *             L <- POST,PUT,DELETE
+ *             |\
+ *             | L <- POST,PUT
+ *             | |\
+ *             | | |
+ *             | |/
+ *             | L <- POST
+ *             | |\
+ *        PUT -> L O <- Not implemented
+ *      GET    |/ \
+ *   DELETE -> O   O <- 'put'
  */
-function create_test_app_3() {
+function create_test_app_3(methods: koa.Middleware, middleware?: koa.Middleware[]) {
   const app = new koa();
+
+  if (middleware && middleware.length) {
+    middleware.forEach((m) => app.use(m));
+  }
+
+  app.use(methods);
+
+  app.use(Layer.match({
+    handlers: [
+      Layer.match({
+        handler: (ctx, next) => next(),
+        methods: ['post', 'put'],
+      }),
+      // Not implemented
+      Layer.match({
+        handler(ctx) { /**/ },
+        method: 'post',
+      }),
+      // Implemented
+      Layer.match({
+        handler(ctx) { ctx.body = 'put'; },
+        method: 'put',
+      }),
+    ],
+    methods: ['post', 'put', 'delete'],
+  }));
+
+  app.use(Layer.match({
+    conditional(ctx) { return ctx.path !== '/not-found'; },
+    handler(ctx) { ctx.status = 200; },
+    methods: ['get', 'delete'],
+  }));
 
   return app;
 }
 
 describe('Layer.method_not_allowed', () => {
-  const app1 = create_test_app_1();
 
   it('check default routes for test case 1', async(done) => {
+    const app1 = create_test_app_1(Layer.method_not_allowed());
+
     await waterfall(
       app1.callback(),
       {
         expected: {
-          body: 'default route',
-          status: 200,
-        },
-        method: 'GET',
-        path: '/',
-      },
-      {
-        expected: {
-          body: 'default route',
+          body: 'get',
           status: 200,
         },
       },
       {
         expected: {
-          body: 'endpoint 1',
+          body: '',
           status: 200,
         },
-        method: 'DELETE',
-        path: '/endpoint1',
+        method: 'head',
       },
       {
-        expected: {
-          body: 'default route',
-          status: 200,
-        },
-        method: 'GET',
-        path: '/endpoint2',
+        expected: 'delete',
+        method: 'delete',
       },
       {
-        expected: {
-          body: 'endpoint 2',
-          status: 200,
-        },
-        method: 'PUT',
-        path: '/endpoint2/+1',
+        expected: 'get',
+        path: '/1',
       },
       {
-        expected: {
-          body: 'default route',
-          status: 200,
-        },
-        method: 'GET',
-        path: '/endpoint2/+2',
+        expected: '',
+        method: 'head',
+        path: '/1',
       },
       {
-        expected: {
-          body: 'endpoint 3',
-          status: 200,
-        },
-        method: 'POST',
-        path: '/endpoint2/+3',
+        expected: 'put',
+        method: 'put',
+      },
+      {
+        expected: 'get',
+        path: '/12',
+      },
+      {
+        expected: 'post',
+        method: 'post',
       },
     );
 
@@ -217,31 +244,204 @@ describe('Layer.method_not_allowed', () => {
   });
 
   it('check default routes for test case 2', async(done) => {
+    const app2 = create_test_app_2(Layer.method_not_allowed());
+
+    await waterfall(
+      app2.callback(),
+      {
+        expected: {
+          body: 'get',
+          status: 200,
+        },
+        method: 'GET',
+      },
+      {
+        expected: {
+          body: 'delete',
+          status: 200,
+        },
+        method: 'DELETE',
+      },
+      {
+        expected: {
+          body: 'post',
+          status: 200,
+        },
+        method: 'post',
+      },
+      {
+        expected: {
+          body: 'get',
+          status: 200,
+        },
+        method: 'get',
+      },
+    );
+
+    done();
+  });
+
+  it('should support 405 Method Not Allowed', async(done) => {
+    const app1 = create_test_app_1(Layer.method_not_allowed());
+    const app3 = create_test_app_3(Layer.method_not_allowed());
+
     await waterfall(
       app1.callback(),
       {
         expected: {
-          body: 'default route',
-          status: 200,
+          allow: [
+            'DELETE',
+            'GET',
+            'HEAD',
+            'POST',
+            'PUT',
+            'OPTIONS',
+          ],
+          body: 'Method Not Allowed',
+          status: 405,
         },
-        method: 'GET',
-        path: '/',
+        method: 'patch',
       },
+    );
+
+    await waterfall(
+      app3.callback(),
       {
         expected: {
-          body: 'endpoint 1',
-          status: 200,
+          allow: [
+            'DELETE',
+            'GET',
+            'HEAD',
+            'POST',
+            'PUT',
+            'OPTIONS',
+          ],
+          body: 'Method Not Allowed',
+          status: 405,
         },
-        method: 'DELETE',
-        path: '/endpoint1',
+        method: 'patch',
       },
+    );
+
+    done();
+  });
+
+  it('should support 501 Not Implemented', async(done) => {
+    /**
+     *    _ <- entry point
+     *    |
+     *    * <- middleware
+     *    |
+     *    L <- layer
+     *    |
+     *    O <- not implemented
+     */
+    const app = new koa();
+
+    app.use(Layer.method_not_allowed());
+
+    app.use(Layer.match({
+      handler: async(ctx) => expect(ctx.path).toBe('/123'),
+    }));
+
+    await waterfall(
+      app.callback(),
       {
         expected: {
-          body: 'default route',
+          // Default allowed methods
+          allow: [
+            'OPTIONS',
+            'GET',
+            'HEAD',
+            'POST',
+            'PUT',
+            'PATCH',
+            'DELETE',
+          ],
+          body: 'Not Implemented',
+          status: 501,
+        },
+        path: '/123',
+      },
+    );
+
+    await waterfall(
+      create_test_app_3(Layer.method_not_allowed()).callback(),
+      {
+        expected: 200,
+        method: 'get',
+      },
+      {
+        expected: 200,
+        method: 'delete',
+      },
+      {
+        expected: 501,
+        method: 'post',
+      },
+      {
+        expected: 200,
+        method: 'put',
+      },
+      {
+        expected: 404,
+        path: '/not-found',
+      },
+    );
+    done();
+  });
+
+  it('should respond to OPTIONS', async(done) => {
+    const app1 = create_test_app_1(Layer.method_not_allowed());
+    const app2 = create_test_app_2(Layer.method_not_allowed());
+    const app3 = create_test_app_3(Layer.method_not_allowed());
+
+    // Test case 1 uses middleware in top chain.
+    await waterfall(
+      app1.callback(),
+      {
+        expected: {
+          allow: [
+            'DELETE',
+            'GET',
+            'HEAD',
+            'POST',
+            'PUT',
+            'OPTIONS',
+          ],
+          body: '',
           status: 200,
         },
-        method: 'GET',
-        path: '/endpoint2',
+        method: 'OPTIONS',
+      },
+    );
+
+    // Test case 2 uses middleware in a layer.
+    await waterfall(
+      app2.callback(),
+      {
+        expected: 404,
+        method: 'OPTIONS',
+      },
+    );
+
+    // Test case 2 uses middleware in a layer.
+    await waterfall(
+      app3.callback(),
+      {
+        expected: {
+          allow: [
+            'OPTIONS',
+            'POST',
+            'PUT',
+            'DELETE',
+            'GET',
+            'HEAD',
+          ],
+          body: '',
+          status: 200,
+        },
+        method: 'OPTIONS',
       },
     );
 
