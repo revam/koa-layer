@@ -24,12 +24,14 @@
     "typescript"
   ],
   "dependencies": {
+    "http-errors": "^1.6.2",
     "is-iterable": "^1.1.0",
     "koa-compose": "^4.0.0",
     "mime-types": "^2.1.17",
     "path-to-regexp": "^2.1.0"
   },
   "devDependencies": {
+    "@types/http-errors": "^1.6.1",
     "@types/jest": "^22.0.1",
     "@types/koa": "^2.0.39",
     "@types/koa-compose": "^3.2.2",
